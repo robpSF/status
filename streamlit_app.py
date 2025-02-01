@@ -2,17 +2,27 @@ import streamlit as st
 import requests
 import pandas as pd
 
-# Configure the page
+# --- Password Authentication ---
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
+if not st.session_state["authenticated"]:
+    st.title("Please Enter Password")
+    password_input = st.text_input("Password", type="password")
+    if st.button("Submit"):
+        if password_input == st.secrets["password"]:
+            st.session_state["authenticated"] = True
+            st.success("Authenticated!")
+        else:
+            st.error("Incorrect password!")
+    st.stop()
+
+# --- App Main Content ---
 st.set_page_config(page_title="Heartz Monitor Dashboard", layout="wide")
 
 def get_status_color(status):
     """
     Return a colourblind-friendly hex color based on the service status.
-    Uses an Okabe–Ito-inspired palette:
-      - Blue (#0072B2) for healthy/up statuses,
-      - Orange (#E69F00) for warnings,
-      - Vermilion (#D55E00) for errors,
-      - Grey for unknown statuses.
     """
     s = str(status).lower()
     if s in ["healthy", "up", "ok", "good"]:
@@ -45,13 +55,12 @@ def fetch_data(url):
         response.raise_for_status()
         return response.json()
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
+        st.error(f"Error fetching data from {url}: {e}")
         return None
 
 def display_service_card_html(service):
     """
     Display a single service's details as a card using inline HTML.
-    This function uses st.markdown with unsafe_allow_html=True.
     """
     name = service.get("name", "Unnamed Service")
     status = service.get("status", "unknown")
@@ -72,22 +81,21 @@ def display_service_card_html(service):
 def main():
     st.title("Heartz Monitor Dashboard")
     
-    # Default view is Table view.
+    # Choose between Table view (default) and Card view for monitor data.
     view_option = st.sidebar.radio("Select view", ("Table view", "Card view"))
     
-    url = "https://monitor.conducttr.com/heartz?detailed=true"
-    with st.spinner("Fetching data..."):
-        data = fetch_data(url)
+    # --- Main Monitor Data ---
+    monitor_url = st.secrets["monitor_url"]
+    with st.spinner("Fetching monitor data..."):
+        data = fetch_data(monitor_url)
     
     if data is None:
-        st.error("Failed to fetch data. Please try again later.")
+        st.error("Failed to fetch monitor data. Please try again later.")
         return
 
-    # Debug: Expand to show the raw JSON (optional)
     with st.expander("Show raw JSON (Debug)"):
         st.json(data)
     
-    # Display overall system status.
     overall_status = data.get("status", "unknown")
     overall_emoji = get_status_emoji(overall_status)
     st.markdown(f"## Overall System Status: {overall_emoji} {overall_status.upper()}")
@@ -97,9 +105,7 @@ def main():
     
     st.write("---")
     
-    # Extract service details from the "results" key.
     services = data.get("results", [])
-    
     if services:
         if view_option == "Table view":
             services_list = []
@@ -115,16 +121,35 @@ def main():
             df = pd.DataFrame(services_list)
             st.dataframe(df)
         else:
-            # Card view: Render each service using the HTML-based card.
             for service in services:
                 display_service_card_html(service)
     else:
-        st.write("No service details found in the data.")
+        st.write("No service details found in the monitor data.")
     
-    # Refresh button to re-run the app and fetch updated data.
+    st.write("---")
+    
+    # --- Kafka Lag Data ---
+    st.markdown("## Kafka Lag Information")
+    kafka_base_url = st.secrets["kafka_lag_base_url"]
+    kafka_lag_list = []
+    
+    # Loop through endpoints 1 to 16.
+    for i in range(1, 17):
+        url_kafka = f"{kafka_base_url}{i}"
+        kafka_response = fetch_data(url_kafka)
+        if kafka_response:
+            topic = kafka_response.get("topic", "Unknown")
+            lag = kafka_response.get("lag", "N/A")
+        else:
+            topic = f"Endpoint {i}"
+            lag = "Error"
+        kafka_lag_list.append({"Topic": topic, "Lag": lag})
+    
+    df_kafka = pd.DataFrame(kafka_lag_list)
+    st.dataframe(df_kafka)
+    
     if st.button("Refresh Data"):
         st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
-
