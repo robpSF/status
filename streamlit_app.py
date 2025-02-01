@@ -166,8 +166,6 @@ def main():
     with st.expander("Kafka Endpoints Debug Info"):
         st.json(kafka_debug_info)
     
-    if st.button("Refresh Data"):
-        st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
