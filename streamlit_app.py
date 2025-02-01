@@ -129,14 +129,18 @@ def main():
     
     st.write("---")
     
-    # --- Kafka Lag Data ---
+    # --- Kafka Lag Data with Progress Bar ---
     st.markdown("## Kafka Lag Information")
     kafka_base_url = st.secrets["kafka_lag_base_url"]
     kafka_lag_list = []
-    kafka_debug_info = []  # Collect debug info for each endpoint
+    kafka_debug_info = []  # For debugging purposes
+    
+    # Create a progress bar for Kafka endpoints.
+    progress_bar = st.progress(0)
+    total_endpoints = 16
     
     # Loop through endpoints 1 to 16.
-    for i in range(1, 17):
+    for i in range(1, total_endpoints + 1):
         url_kafka = f"{kafka_base_url}{i}"
         kafka_response = fetch_data(url_kafka)
         if kafka_response:
@@ -148,7 +152,13 @@ def main():
             lag = "Error"
             debug_message = f"Endpoint {i} returned error"
         kafka_lag_list.append({"Topic": topic, "Lag": lag})
-        kafka_debug_info.append({"Endpoint": i, "URL": url_kafka, "Response": kafka_response if kafka_response else "Error", "Message": debug_message})
+        kafka_debug_info.append({
+            "Endpoint": i,
+            "URL": url_kafka,
+            "Response": kafka_response if kafka_response else "Error",
+            "Message": debug_message
+        })
+        progress_bar.progress(i / total_endpoints)
     
     df_kafka = pd.DataFrame(kafka_lag_list)
     st.dataframe(df_kafka)
