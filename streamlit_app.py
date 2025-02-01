@@ -138,9 +138,7 @@ def main():
     # Loop through endpoints 1 to 16.
     for i in range(1, 17):
         url_kafka = f"{kafka_base_url}{i}"
-        st.write(url_kafka)
         kafka_response = fetch_data(url_kafka)
-        st.write(kafka_response)
         if kafka_response:
             topic = kafka_response.get("topic", "Unknown")
             lag = kafka_response.get("lag", "N/A")
