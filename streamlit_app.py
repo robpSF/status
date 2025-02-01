@@ -23,6 +23,7 @@ st.set_page_config(page_title="Heartz Monitor Dashboard", layout="wide")
 def get_status_color(status):
     """
     Return a colourblind-friendly hex color based on the service status.
+    Uses an Okabe–Ito-inspired palette.
     """
     s = str(status).lower()
     if s in ["healthy", "up", "ok", "good"]:
@@ -132,6 +133,7 @@ def main():
     st.markdown("## Kafka Lag Information")
     kafka_base_url = st.secrets["kafka_lag_base_url"]
     kafka_lag_list = []
+    kafka_debug_info = []  # Collect debug info for each endpoint
     
     # Loop through endpoints 1 to 16.
     for i in range(1, 17):
@@ -140,13 +142,19 @@ def main():
         if kafka_response:
             topic = kafka_response.get("topic", "Unknown")
             lag = kafka_response.get("lag", "N/A")
+            debug_message = f"Endpoint {i} OK"
         else:
             topic = f"Endpoint {i}"
             lag = "Error"
+            debug_message = f"Endpoint {i} returned error"
         kafka_lag_list.append({"Topic": topic, "Lag": lag})
+        kafka_debug_info.append({"Endpoint": i, "URL": url_kafka, "Response": kafka_response if kafka_response else "Error", "Message": debug_message})
     
     df_kafka = pd.DataFrame(kafka_lag_list)
     st.dataframe(df_kafka)
+    
+    with st.expander("Kafka Endpoints Debug Info"):
+        st.json(kafka_debug_info)
     
     if st.button("Refresh Data"):
         st.experimental_rerun()
